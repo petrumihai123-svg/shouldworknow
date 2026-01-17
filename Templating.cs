@@ -2,14 +2,25 @@ namespace PortableWinFormsRecorder;
 
 public static class Templating
 {
-    public static string Apply(string input, Dictionary<string, string> data)
+    // Replaces {{Key}} with data[Key]. Unknown keys -> empty.
+    public static string Apply(string? input, IReadOnlyDictionary<string, string> data)
     {
-        var output = input;
+        if (string.IsNullOrEmpty(input)) return input ?? "";
 
+        var s = input;
         foreach (var kv in data)
-            output = output.Replace("{{" + kv.Key + "}}", kv.Value, StringComparison.OrdinalIgnoreCase);
+            s = s.Replace("{{" + kv.Key + "}}", kv.Value ?? "", StringComparison.OrdinalIgnoreCase);
 
-        output = output.Replace("{{timestamp}}", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-        return output;
+        // If any templates remain, blank them
+        while (true)
+        {
+            var start = s.IndexOf("{{", StringComparison.Ordinal);
+            if (start < 0) break;
+            var end = s.IndexOf("}}", start + 2, StringComparison.Ordinal);
+            if (end < 0) break;
+            s = s.Remove(start, (end + 2) - start);
+        }
+
+        return s;
     }
 }
