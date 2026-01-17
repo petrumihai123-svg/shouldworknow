@@ -1,126 +1,125 @@
+using System.Text.Json;
+
 namespace PortableWinFormsRecorder;
 
 public static class Cli
 {
-    public static int Dispatch(string[] args)
+    public static int Run(string[] argv)
     {
-        if (args.Length == 0 || args[0] is "-h" or "--help")
+        var args = Args.Parse(argv);
+
+        if (args.Help || string.IsNullOrWhiteSpace(args.Command))
         {
             PrintHelp();
             return 0;
         }
 
-        var cmd = args[0].ToLowerInvariant();
-        return cmd switch
+        try
         {
-            "record" => Record(args.Skip(1).ToArray()),
-            "run"    => Run(args.Skip(1).ToArray()),
-            "print"  => Print(args.Skip(1).ToArray()),
-            _        => Unknown(cmd)
-        };
+            return args.Command switch
+            {
+                "record" => Record(args),
+                "run" => RunScript(args),
+                "print" => Print(args),
+                _ => Unknown(args.Command)
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR: {ex.Message}");
+            return 2;
+        }
     }
 
-    private static int Unknown(string cmd)
+    static int Unknown(string cmd)
     {
         Console.Error.WriteLine($"Unknown command: {cmd}");
         PrintHelp();
-        return 2;
+        return 1;
     }
 
-    public static void PrintHelp()
+    static void PrintHelp()
     {
-        Console.WriteLine("""
-PortableWinFormsRecorder v1 - GUI + CLI recorder/runner for WinForms (UIA + image fallback)
+        Console.WriteLine(
+"""
+PortableWinFormsRecorder
 
-USAGE:
-  PortableWinFormsRecorder record [--process MyApp] --out script.json [--var-mode] [--capture-images]
-  PortableWinFormsRecorder run --script script.json --data data.csv
-  PortableWinFormsRecorder print --script script.json
+GUI:
+  dotnet run -c Release
 
-RECORDING:
-  - Desktop mode works without a process. If you set --process, start that app first.
-  - Stop recording with Ctrl+Shift+S (or in GUI).
-  - --capture-images captures element screenshots for image fallback.
+CLI:
+  dotnet run -c Release -- record --process MyWinFormsApp --out script.json
+  dotnet run -c Release -- run --script script.json --data data.csv
+  dotnet run -c Release -- print --script script.json
 
-ASSERTIONS (in script.json):
-  - AssertExists
-  - AssertTextEquals
-  - AssertTextContains
+Notes:
+  - record is a minimal stub that creates an empty script skeleton.
+  - run uses Windows UIAutomation to locate and act on elements.
 
-PUBLISH PORTABLE:
-  dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+Script step examples:
+  { "action": "Click", "target": { "automationId": "btnOk" } }
+  { "action": "SetText", "target": { "automationId": "txtName" }, "value": "{{Name}}" }
+  { "action": "AssertTextContains", "target": { "automationId": "lblStatus" }, "value": "Ready" }
 """);
     }
 
-    public static int Record(string[] args)
+    static int Record(Args args)
     {
-        var opts = Args.Parse(args);
-        var processName = opts.Get("--process") ?? "";
-        var outPath = opts.Get("--out") ?? "script.json";
-        var varMode = opts.Has("--var-mode");
-        var captureImages = opts.Has("--capture-images");
+        if (string.IsNullOrWhiteSpace(args.OutPath))
+            throw new ArgumentException("Missing --out <path>");
 
         var script = new Script
         {
-            App = new AppTarget { ProcessName = processName },
-            Steps = new List<Step>()
+            Steps = new List<Step>
+            {
+                new() { Action = ActionKind.WaitMs, Ms = 250 }
+            }
         };
 
-        var assetsDir = Assets.ResolveAssetsDir(outPath);
-        Directory.CreateDirectory(assetsDir);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args.OutPath))!);
 
-        using var recorder = new Recorder(processName, script, new RecorderOptions
-        {
-            VarMode = varMode,
-            CaptureImages = captureImages,
-            AssetsDir = assetsDir
-        });
+        var json = JsonSerializer.Serialize(script, JsonUtil.Options);
+        File.WriteAllText(args.OutPath, json);
 
-        recorder.Log += Console.WriteLine;
-        recorder.Start();
-
-        Console.WriteLine("Recording... Stop with Ctrl+Shift+S");
-        recorder.WaitUntilStopped();
-
-        File.WriteAllText(outPath, System.Text.Json.JsonSerializer.Serialize(script, JsonOpts.Indented));
-        Console.WriteLine($"Saved: {Path.GetFullPath(outPath)}");
+        Console.WriteLine($"Wrote stub script: {args.OutPath}");
+        Console.WriteLine("Tip: Use the GUI to add steps, or edit the JSON.");
         return 0;
     }
 
-    public static int Run(string[] args)
+    static int Print(Args args)
     {
-        var opts = Args.Parse(args);
-        var scriptPath = opts.Get("--script") ?? "script.json";
-        var dataPath = opts.Get("--data") ?? "data.csv";
+        if (string.IsNullOrWhiteSpace(args.ScriptPath))
+            throw new ArgumentException("Missing --script <path>");
 
-        var script = System.Text.Json.JsonSerializer.Deserialize<Script>(File.ReadAllText(scriptPath), JsonOpts.Default)
-                     ?? throw new Exception("Failed to parse script");
+        var script = ScriptIO.Load(args.ScriptPath);
+        Console.WriteLine(JsonSerializer.Serialize(script, JsonUtil.Options));
+        return 0;
+    }
 
-        var rows = Csv.Load(dataPath);
-        if (rows.Count == 0) throw new Exception("No data rows found in CSV");
+    static int RunScript(Args args)
+    {
+        if (string.IsNullOrWhiteSpace(args.ScriptPath))
+            throw new ArgumentException("Missing --script <path>");
 
-        var assetsDir = Assets.ResolveAssetsDir(scriptPath);
+        var script = ScriptIO.Load(args.ScriptPath);
+        var data = string.IsNullOrWhiteSpace(args.DataPath)
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : Csv.ReadKeyValueFirstRow(args.DataPath);
 
-        int runNo = 0;
-        foreach (var row in rows)
-        {
-            runNo++;
-            Console.WriteLine($"Run #{runNo}: " + string.Join(", ", row.Select(kv => $"{kv.Key}={kv.Value}")));
-            Runner.RunOnce(script, row, new RunnerOptions { AssetsDir = assetsDir, Log = Console.WriteLine });
-        }
+        var runner = new Runner();
+        runner.Execute(script, data);
 
         Console.WriteLine("Done.");
         return 0;
     }
+}
 
-    public static int Print(string[] args)
+internal static class JsonUtil
+{
+    public static readonly JsonSerializerOptions Options = new()
     {
-        var opts = Args.Parse(args);
-        var scriptPath = opts.Get("--script") ?? "script.json";
-        var script = System.Text.Json.JsonSerializer.Deserialize<Script>(File.ReadAllText(scriptPath), JsonOpts.Default)
-                     ?? throw new Exception("Failed to parse script");
-
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(script, JsonOpts.Indented));
-        return 0;
-    }
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 }
