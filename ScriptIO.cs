@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text.Json;
 
 namespace PortableWinFormsRecorder;
@@ -16,7 +18,11 @@ public static class ScriptIO
 
     public static void Save(string path, Script script)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var full = Path.GetFullPath(path);
+        var dir = Path.GetDirectoryName(full);
+        if (!string.IsNullOrWhiteSpace(dir))
+            Directory.CreateDirectory(dir);
+
         var json = JsonSerializer.Serialize(script, JsonUtil.Options);
         File.WriteAllText(path, json);
     }
