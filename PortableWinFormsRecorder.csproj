@@ -3,12 +3,13 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
-    <!-- Allows building on non-Windows machines (still runs only on Windows) -->
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
 
     <AssemblyName>PortableWinFormsRecorder</AssemblyName>
     <RootNamespace>PortableWinFormsRecorder</RootNamespace>
