@@ -146,12 +146,12 @@ public sealed class Recorder
                     var bytes = WindowCapture.CaptureScreenRect(r);
 
                     var assetsDir = Assets.EnsureAssetsDir(ScriptPathForAssets!);
-                    var path = Assets.NewPngName(assetsDir, "click");
+                    var filePath = Assets.NewPngName(assetsDir, "click");
 
-                    File.WriteAllBytes(path, bytes);
+                    System.IO.File.WriteAllBytes(filePath, bytes);
 
-                    // Store filename in Value (simple)
-                    step.Value = Path.GetFileName(path);
+                    // Store just filename
+                    step.Value = System.IO.Path.GetFileName(filePath);
                 }
             }
             catch
