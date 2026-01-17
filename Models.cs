@@ -1,47 +1,39 @@
+using System.Text.Json.Serialization;
+
 namespace PortableWinFormsRecorder;
 
 public sealed class Script
 {
-    public AppTarget App { get; set; } = new();
+    public int Version { get; set; } = 1;
     public List<Step> Steps { get; set; } = new();
 }
 
-public sealed class AppTarget
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ActionKind
 {
-    public string ProcessName { get; set; } = "";
+    Click,
+    SetText,
+    WaitMs,
+
+    AssertExists,
+    AssertTextEquals,
+    AssertTextContains
 }
 
 public sealed class Step
 {
-    public string Action { get; set; } = "";
-    public Target Target { get; set; } = new();
+    public ActionKind Action { get; set; }
+    public Target? Target { get; set; }
     public string? Value { get; set; }
-    public int? DelayMs { get; set; }
-    public string? Note { get; set; }
+    public int? Ms { get; set; }
 }
 
 public sealed class Target
 {
+    // Any of these may be used to resolve element
     public string? AutomationId { get; set; }
     public string? Name { get; set; }
     public string? ClassName { get; set; }
-    public string? ControlType { get; set; }
-    public string? WindowName { get; set; }
-
-    public string? Image { get; set; }
-    public int? ClickOffsetX { get; set; }
-    public int? ClickOffsetY { get; set; }
-}
-
-public static class JsonOpts
-{
-    public static readonly System.Text.Json.JsonSerializerOptions Default = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    public static readonly System.Text.Json.JsonSerializerOptions Indented = new()
-    {
-        WriteIndented = true
-    };
+    public string? ControlType { get; set; } // e.g. "Button", "Edit", "Text"
+    public string? Process { get; set; }     // process name (optional)
 }
