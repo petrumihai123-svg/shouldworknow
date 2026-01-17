@@ -2,60 +2,36 @@ namespace PortableWinFormsRecorder;
 
 public static class Csv
 {
-    public static List<Dictionary<string, string>> Load(string path)
+    // Simple CSV reader:
+    // - first row headers
+    // - second row values
+    // Returns dict header->value (missing -> "")
+    public static Dictionary<string, string> ReadKeyValueFirstRow(string path)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("CSV not found", path);
 
-        var lines = File.ReadAllLines(path).Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
-        if (lines.Length < 2) return new();
+        var lines = File.ReadAllLines(path);
+        if (lines.Length == 0) return new(StringComparer.OrdinalIgnoreCase);
 
-        var headers = Split(lines[0]).Select(h => h.Trim()).ToArray();
-        var rows = new List<Dictionary<string, string>>();
+        var headers = Split(lines[0]);
+        var values = (lines.Length > 1) ? Split(lines[1]) : Array.Empty<string>();
 
-        for (int i = 1; i < lines.Length; i++)
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < headers.Length; i++)
         {
-            var cols = Split(lines[i]);
-            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            for (int c = 0; c < headers.Length; c++)
-                dict[headers[c]] = c < cols.Count ? cols[c] : "";
-            rows.Add(dict);
+            var key = headers[i].Trim();
+            if (string.IsNullOrEmpty(key)) continue;
+            var val = (i < values.Length) ? values[i] : "";
+            dict[key] = val;
         }
-
-        return rows;
+        return dict;
     }
 
-    private static List<string> Split(string line)
+    static string[] Split(string line)
     {
-        var res = new List<string>();
-        var cur = new System.Text.StringBuilder();
-        bool inQuotes = false;
-
-        for (int i = 0; i < line.Length; i++)
-        {
-            char ch = line[i];
-
-            if (ch == '"')
-            {
-                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
-                {
-                    cur.Append('"');
-                    i++;
-                }
-                else inQuotes = !inQuotes;
-                continue;
-            }
-
-            if (ch == ',' && !inQuotes)
-            {
-                res.Add(cur.ToString());
-                cur.Clear();
-                continue;
-            }
-
-            cur.Append(ch);
-        }
-        res.Add(cur.ToString());
-        return res;
+        // Minimal CSV split (no quoted commas support).
+        // If you need full CSV support, swap this for a proper parser later.
+        return line.Split(',');
     }
 }
