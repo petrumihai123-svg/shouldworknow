@@ -1,33 +1,50 @@
-using FlaUI.Core.AutomationElements;
+using System.Windows.Automation;
 
 namespace PortableWinFormsRecorder;
 
 public static class Selectors
 {
-    public static Target FromElement(AutomationElement el, string? windowNameHint = null)
+    public static Condition BuildCondition(Target target)
     {
-        var p = el.Properties;
+        var parts = new List<Condition>();
 
-        var t = new Target
+        if (!string.IsNullOrWhiteSpace(target.AutomationId))
+            parts.Add(new PropertyCondition(AutomationElement.AutomationIdProperty, target.AutomationId));
+
+        if (!string.IsNullOrWhiteSpace(target.Name))
+            parts.Add(new PropertyCondition(AutomationElement.NameProperty, target.Name));
+
+        if (!string.IsNullOrWhiteSpace(target.ClassName))
+            parts.Add(new PropertyCondition(AutomationElement.ClassNameProperty, target.ClassName));
+
+        if (!string.IsNullOrWhiteSpace(target.ControlType))
         {
-            AutomationId = p.AutomationId.ValueOrDefault,
-            Name = p.Name.ValueOrDefault,
-            ClassName = p.ClassName.ValueOrDefault,
-            ControlType = p.ControlType.ValueOrDefault.ToString(),
-            WindowName = windowNameHint
-        };
+            var ct = ParseControlType(target.ControlType!);
+            if (ct != null)
+                parts.Add(new PropertyCondition(AutomationElement.ControlTypeProperty, ct));
+        }
 
-        if (string.IsNullOrWhiteSpace(t.AutomationId)) t.AutomationId = null;
-        if (string.IsNullOrWhiteSpace(t.Name)) t.Name = null;
-        if (string.IsNullOrWhiteSpace(t.ClassName)) t.ClassName = null;
-        if (string.IsNullOrWhiteSpace(t.ControlType)) t.ControlType = null;
-        if (string.IsNullOrWhiteSpace(t.WindowName)) t.WindowName = null;
+        if (parts.Count == 0)
+            throw new ArgumentException("Target must specify at least one of: AutomationId, Name, ClassName, ControlType.");
 
-        return t;
+        return parts.Count == 1 ? parts[0] : new AndCondition(parts.ToArray());
     }
 
-    public static bool IsTooWeak(Target t)
-        => string.IsNullOrWhiteSpace(t.AutomationId) &&
-           string.IsNullOrWhiteSpace(t.Name) &&
-           string.IsNullOrWhiteSpace(t.ClassName);
+    static ControlType? ParseControlType(string s)
+    {
+        s = s.Trim();
+        return s.ToLowerInvariant() switch
+        {
+            "button" => ControlType.Button,
+            "edit" or "textbox" => ControlType.Edit,
+            "text" or "label" => ControlType.Text,
+            "window" => ControlType.Window,
+            "pane" => ControlType.Pane,
+            "list" => ControlType.List,
+            "listitem" => ControlType.ListItem,
+            "checkbox" => ControlType.CheckBox,
+            "combobox" => ControlType.ComboBox,
+            _ => null
+        };
+    }
 }
