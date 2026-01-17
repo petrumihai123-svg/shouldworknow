@@ -1,4 +1,5 @@
-using System.Windows.Forms;
+using System.Globalization;
+using System.Text;
 
 namespace PortableWinFormsRecorder;
 
@@ -7,23 +8,16 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
-        try
-        {
-            if (args.Length > 0)
-                return Cli.Dispatch(args);
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+        CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
-            ApplicationConfiguration.Initialize();
-        Application.ThreadException += (_, e) =>
-        {
-            try { MessageBox.Show(e.Exception.ToString(), "UI Thread Exception"); } catch { }
-        };
-            Application.Run(new MainForm());
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(ex.ToString(), "PortableWinFormsRecorder - Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return 1;
-        }
+        // CLI mode if args present
+        if (args.Length > 0)
+            return Cli.Run(args);
+
+        ApplicationConfiguration.Initialize();
+        Application.Run(new MainForm());
+        return 0;
     }
 }
