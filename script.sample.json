@@ -1,0 +1,35 @@
+{
+  "app": {
+    "processName": "MyWinFormsApp"
+  },
+  "steps": [
+    {
+      "action": "Click",
+      "target": {
+        "automationId": "txtUser",
+        "controlType": "Edit"
+      }
+    },
+    {
+      "action": "SetText",
+      "target": {
+        "automationId": "txtUser",
+        "controlType": "Edit"
+      },
+      "value": "{{username}}"
+    },
+    {
+      "action": "Click",
+      "target": {
+        "automationId": "btnLogin",
+        "controlType": "Button"
+      }
+    },
+    {
+      "action": "AssertExists",
+      "target": {
+        "name": "Welcome"
+      }
+    }
+  ]
+}
