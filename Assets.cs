@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+
 namespace PortableWinFormsRecorder;
 
 public static class Assets
