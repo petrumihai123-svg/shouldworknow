@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text.Json;
 
 namespace PortableWinFormsRecorder;
@@ -53,7 +55,7 @@ CLI:
   dotnet run -c Release -- print --script script.json
 
 Notes:
-  - record is a minimal stub that creates an empty script skeleton.
+  - record is a minimal stub that creates an initial script skeleton.
   - run uses Windows UIAutomation to locate and act on elements.
 
 Script step examples:
@@ -70,19 +72,21 @@ Script step examples:
 
         var script = new Script
         {
-            Steps = new List<Step>
+            Steps = new()
             {
                 new() { Action = ActionKind.WaitMs, Ms = 250 }
             }
         };
 
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args.OutPath))!);
+        var outFull = Path.GetFullPath(args.OutPath);
+        var outDir = Path.GetDirectoryName(outFull);
+        if (!string.IsNullOrWhiteSpace(outDir))
+            Directory.CreateDirectory(outDir);
 
         var json = JsonSerializer.Serialize(script, JsonUtil.Options);
         File.WriteAllText(args.OutPath, json);
 
         Console.WriteLine($"Wrote stub script: {args.OutPath}");
-        Console.WriteLine("Tip: Use the GUI to add steps, or edit the JSON.");
         return 0;
     }
 
