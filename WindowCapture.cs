@@ -1,5 +1,6 @@
+using System;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
+using System.IO;
 
 namespace PortableWinFormsRecorder;
 
