@@ -1,18 +1,11 @@
 namespace PortableWinFormsRecorder;
 
+// Reserved for future image-capture assets.
 public static class Assets
 {
-    public static string ResolveAssetsDir(string scriptPath)
+    public static string GetAssetsDirNearScript(string scriptPath)
     {
-        var full = Path.GetFullPath(scriptPath);
-        var dir = Path.GetDirectoryName(full) ?? ".";
-        var name = Path.GetFileNameWithoutExtension(full);
-        return Path.Combine(dir, name + "_assets");
-    }
-
-    public static string Combine(string assetsDir, string? relative)
-    {
-        if (string.IsNullOrWhiteSpace(relative)) return "";
-        return Path.Combine(assetsDir, relative);
+        var dir = Path.GetDirectoryName(Path.GetFullPath(scriptPath)) ?? Environment.CurrentDirectory;
+        return Path.Combine(dir, "script_assets");
     }
 }
