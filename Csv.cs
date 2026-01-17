@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+
 namespace PortableWinFormsRecorder;
 
 public static class Csv
@@ -31,7 +34,6 @@ public static class Csv
     static string[] Split(string line)
     {
         // Minimal CSV split (no quoted commas support).
-        // If you need full CSV support, swap this for a proper parser later.
         return line.Split(',');
     }
 }
