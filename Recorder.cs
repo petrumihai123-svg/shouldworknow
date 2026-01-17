@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Automation;
 
@@ -14,17 +16,12 @@ public sealed class Recorder
     readonly HighlightOverlay _highlight = new();
     readonly RecordingIndicatorOverlay _recOverlay = new();
 
-    // Hover highlight while recording
     readonly System.Windows.Forms.Timer _hoverTimer = new() { Interval = 50 };
 
-    // Settings
     public bool CaptureScreenshots { get; set; } = true;
 
-    // Where to put assets (if CaptureScreenshots)
+    // Script path used to locate/create script_assets folder
     public string? ScriptPathForAssets { get; set; }
-
-    // Optional: ignore clicks on our own overlay windows
-    public Func<IntPtr, bool>? IsWindowOurs { get; set; }
 
     public bool IsRecording => _recording;
 
@@ -42,7 +39,6 @@ public sealed class Recorder
         _recOverlay.Show();
 
         _hoverTimer.Start();
-
         InstallMouseHook();
     }
 
@@ -64,7 +60,6 @@ public sealed class Recorder
 
         _mouseProc = MouseHookCallback;
 
-        // Low-level hook: hMod should be module handle; passing current module works
         var hMod = Win32Hooks.GetModuleHandle(null);
         _mouseHook = Win32Hooks.SetWindowsHookEx(Win32Hooks.WH_MOUSE_LL, _mouseProc, hMod, 0);
 
@@ -84,7 +79,7 @@ public sealed class Recorder
     {
         if (!_recording) return;
 
-        var p = Cursor.Position;
+        var p = System.Windows.Forms.Cursor.Position;
         try
         {
             var el = AutomationElement.FromPoint(new System.Windows.Point(p.X, p.Y));
@@ -114,16 +109,9 @@ public sealed class Recorder
                     var x = hs.pt.x;
                     var y = hs.pt.y;
 
-                    // Avoid recording clicks on our own overlays by hit-testing UIA at point:
                     var el = AutomationElement.FromPoint(new System.Windows.Point(x, y));
                     if (el != null)
-                    {
-                        // If caller provided a window filter, try to respect it (best-effort)
-                        if (IsProbablyOurOverlay(el))
-                            return Win32Hooks.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
-
                         RecordClick(el);
-                    }
                 }
                 catch
                 {
@@ -135,37 +123,11 @@ public sealed class Recorder
         return Win32Hooks.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
     }
 
-    bool IsProbablyOurOverlay(AutomationElement el)
-    {
-        // Best-effort: our overlays are tool windows and usually have our process id
-        try
-        {
-            var pid = el.Current.ProcessId;
-            if (pid == Environment.ProcessId)
-            {
-                var name = el.Current.Name ?? "";
-                var cls = el.Current.ClassName ?? "";
-                // overlays may have empty name/class; keep minimal
-                if (name.Contains("REC", StringComparison.OrdinalIgnoreCase)) return true;
-                if (cls.Contains("WindowsForms", StringComparison.OrdinalIgnoreCase)) return false; // most apps are WinForms too
-            }
-        }
-        catch { }
-        return false;
-    }
-
     void RecordClick(AutomationElement el)
     {
         if (_script == null) return;
 
         var target = UiAutomationUtil.BuildTargetFromElement(el);
-
-        // Prefer stable selectors: AutomationId; otherwise Name+ControlType; otherwise ClassName+Name
-        if (target.AutomationId == null && target.Name == null && target.ClassName == null)
-        {
-            // If nothing useful, keep ControlType at least
-            target.ControlType ??= "Control";
-        }
 
         var step = new Step
         {
@@ -173,7 +135,6 @@ public sealed class Recorder
             Target = target
         };
 
-        // Optional screenshot capture
         if (CaptureScreenshots && !string.IsNullOrWhiteSpace(ScriptPathForAssets))
         {
             try
@@ -189,7 +150,7 @@ public sealed class Recorder
 
                     File.WriteAllBytes(path, bytes);
 
-                    // Store relative-ish hint in Value (keeps model simple)
+                    // Store filename in Value (simple)
                     step.Value = Path.GetFileName(path);
                 }
             }
